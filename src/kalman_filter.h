@@ -1,68 +1,41 @@
 #ifndef KALMAN_FILTER_H_
 #define KALMAN_FILTER_H_
 
+#include <memory>
+
 #include "Eigen/Dense"
+#include "bayesian_filter.h"
 
-class KalmanFilter {
+class KalmanFilter : public BayesianFilter {
+ protected:
+  std::shared_ptr<Process> process_;
+
  public:
-  /**
-   * Constructor
-   */
-  KalmanFilter();
+  void init(const std::shared_ptr<Process> &process) { process_ = process; }
 
-  /**
-   * Destructor
-   */
-  virtual ~KalmanFilter();
+  virtual void predict() {
+    auto F = process_->F();
+    auto P = process_->P();
+    auto Q = process_->Q();
 
-  /**
-   * Init Initializes Kalman filter
-   * @param x_in Initial state
-   * @param P_in Initial state covariance
-   * @param F_in Transition matrix
-   * @param H_in Measurement matrix
-   * @param R_in Measurement covariance matrix
-   * @param Q_in Process covariance matrix
-   */
-  void Init(Eigen::VectorXd &x_in, Eigen::MatrixXd &P_in, Eigen::MatrixXd &F_in,
-            Eigen::MatrixXd &H_in, Eigen::MatrixXd &R_in, Eigen::MatrixXd &Q_in);
+    process_->x_ = F * process_->x_;
+    process_->P_ = F * P * F.transpose() + Q;
+  }
 
-  /**
-   * Prediction Predicts the state and the state covariance
-   * using the process model
-   * @param delta_T Time between k and k+1 in s
-   */
-  void Predict();
+  virtual void update(const std::shared_ptr<Measurement> &measurement) {
+    auto P = process_->P();
+    auto H = measurement->H();
+    auto R = measurement->R();
+    auto y = measurement->y();
 
-  /**
-   * Updates the state by using standard Kalman Filter equations
-   * @param z The measurement at k+1
-   */
-  void Update(const Eigen::VectorXd &z);
+    auto T = H * P * H.transpose() + R;
+    auto K = P * H.transpose() * T.inverse();
 
-  /**
-   * Updates the state by using Extended Kalman Filter equations
-   * @param z The measurement at k+1
-   */
-  void UpdateEKF(const Eigen::VectorXd &z);
+    process_->x_ = process_->x_ + (K * y);
+    process_->P_ = P - K * H * P;
+  }
 
-  // state vector
-  Eigen::VectorXd x_;
-
-  // state covariance matrix
-  Eigen::MatrixXd P_;
-
-  // state transition matrix
-  Eigen::MatrixXd F_;
-
-  // process covariance matrix
-  Eigen::MatrixXd Q_;
-
-  // measurement matrix
-  Eigen::MatrixXd H_;
-
-  // measurement covariance matrix
-  Eigen::MatrixXd R_;
+  Vector x() { return process_->x_; }
 };
 
-#endif // KALMAN_FILTER_H_
+#endif /* KALMAN_FILTER_H_ */

@@ -4,6 +4,9 @@
 # build files
 build/
 
+# exe files
+bin/
+
 # editor config
 .vscode/
 
